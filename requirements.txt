@@ -1,0 +1,11 @@
+pandas
+matplotlib
+seaborn
+numpy
+scikit-learn
+statsmodels
+
+# For Dashboard Design using Plotly Dash
+dash
+dash-bootstrap-components
+dash-ag-grid
