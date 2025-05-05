@@ -9,7 +9,7 @@ import numpy as np
 import plotly.express as px
 
 # Load dataset
-df = pd.read_csv("cleaned_data.csv")
+df = pd.read_csv("enriched_jora_jobs_9000.csv")
 
 # Handle Experience column
 def parse_experience(val):
@@ -46,7 +46,7 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
 app.title = "Job Listings Dashboard"
 server = app.server
 
-# Sidebar Filters
+# Sidebar Filters 
 sidebar = dbc.Col([
     html.H4("Filters", className="pt-3"),
     html.Hr(),
@@ -66,16 +66,7 @@ sidebar = dbc.Col([
         multi=True,
         placeholder="Select City(s)"
     ),
-
-    dbc.Label("Experience"),
-    dcc.RangeSlider(
-        id='exp-filter',
-        min=0,
-        max=10,
-        marks={i: f"{i} yrs" for i in range(0, 11)},
-        step=1,
-        value=[0, 5]
-    ),
+    
 ], width=2, style={"backgroundColor": "#f8f9fa", "height": "100vh", "padding": "20px", "position": "fixed"})
 
 # KPI Cards
@@ -85,7 +76,7 @@ def kpi_card(title, value):
             html.H6(title, className="card-title"),
             html.H4(value, className="card-text")
         ])
-    ], className="m-2")
+    ], className="m-1")  # Reduced margin for better alignment
 
 # Map Tab Layout
 map_tab = dbc.Tab(label="Skill Map", children=[
@@ -108,10 +99,10 @@ map_tab = dbc.Tab(label="Skill Map", children=[
 content = dbc.Col([
     html.H2("Job Listings Overview", className="mb-4"),
     dbc.Row([
-        kpi_card("Total Jobs", df.shape[0]),
-        kpi_card("Unique Companies", df['Company'].nunique()),
-        kpi_card("Top City", df['City'].mode()[0]),
-        kpi_card("Avg Experience", f"{df['ParsedExperience'].dropna().mean():.1f} yrs"),
+        dbc.Col(kpi_card("Total Jobs", df.shape[0]), width=3),
+        dbc.Col(kpi_card("Top State", df['State'].mode()[0]), width=3),
+        dbc.Col(kpi_card("Top City", df['City'].mode()[0]), width=3),
+        dbc.Col(kpi_card("Avg Experience", f"{df['ParsedExperience'].dropna().mean():.1f} yrs"), width=3),
     ]),
     html.Hr(),
 
@@ -119,15 +110,15 @@ content = dbc.Col([
         dbc.Tab(label="Dashboard", children=[
             html.H5("Data Visualizations"),
             dbc.Row([
+                dbc.Col(dcc.Graph(id='skills-treemap'), width=12),
+            ]),
+            dbc.Row([
                 dbc.Col(dcc.Graph(id='exp-distribution'), width=6),
                 dbc.Col(dcc.Graph(id='jobs-by-city'), width=6),
             ]),
             dbc.Row([
                 dbc.Col(dcc.Graph(id='jobs-by-state'), width=6),
                 dbc.Col(dcc.Graph(id='jobs-by-company'), width=6),
-            ]),
-            dbc.Row([
-                dbc.Col(dcc.Graph(id='skills-treemap'), width=12),
             ]),
             html.Hr(),
             html.H5("All Job Listings"),
@@ -149,27 +140,21 @@ app.layout = dbc.Container([
     dbc.Row([sidebar, content])
 ], fluid=True)
 
-# Callback: Table Filter
+# Callback: Table Filter 
 @app.callback(
     Output('job-table', 'data'),
     [Input('state-filter', 'value'),
-     Input('city-filter', 'value'),
-     Input('exp-filter', 'value')]
+     Input('city-filter', 'value')]
 )
-def update_table(selected_states, selected_cities, selected_experience):
+def update_table(selected_states, selected_cities):
     filtered_df = df.copy()
     if selected_states:
         filtered_df = filtered_df[filtered_df['State'].isin(selected_states)]
     if selected_cities:
         filtered_df = filtered_df[filtered_df['City'].isin(selected_cities)]
-    min_exp, max_exp = selected_experience
-    filtered_df = filtered_df[
-        (filtered_df['ParsedExperience'] >= min_exp) & 
-        (filtered_df['ParsedExperience'] <= max_exp)
-    ]
     return filtered_df.to_dict('records')
 
-# Callback: Graph Updates
+# Callback: Graph Updates 
 @app.callback(
     [Output('exp-distribution', 'figure'),
      Output('jobs-by-city', 'figure'),
@@ -177,40 +162,34 @@ def update_table(selected_states, selected_cities, selected_experience):
      Output('jobs-by-company', 'figure'),
      Output('skills-treemap', 'figure')],
     [Input('state-filter', 'value'),
-     Input('city-filter', 'value'),
-     Input('exp-filter', 'value')]
+     Input('city-filter', 'value')]
 )
-def update_visualizations(selected_states, selected_cities, selected_experience):
+def update_visualizations(selected_states, selected_cities):
     filtered_df = df.copy()
     if selected_states:
         filtered_df = filtered_df[filtered_df['State'].isin(selected_states)]
     if selected_cities:
         filtered_df = filtered_df[filtered_df['City'].isin(selected_cities)]
-    min_exp, max_exp = selected_experience
-    filtered_df = filtered_df[
-        (filtered_df['ParsedExperience'] >= min_exp) & 
-        (filtered_df['ParsedExperience'] <= max_exp)
-    ]
+
 
     # Experience Distribution
     exp_dist_fig = px.histogram(filtered_df, x='ParsedExperience', nbins=20, title="Experience Distribution")
+    exp_dist_fig.update_layout(xaxis_title="Experience", yaxis_title="Count")
 
     # Jobs by City
     city_counts = filtered_df['City'].value_counts().reset_index()
-    city_counts.columns = ['City', 'count']
-    jobs_by_city_fig = px.bar(city_counts, x='City', y='count', title="Jobs by City")
+    city_counts.columns = ['City', 'Count']
+    jobs_by_city_fig = px.bar(city_counts, x='City', y='Count', title="Jobs by City")
 
     # Jobs by State
     state_counts = filtered_df['State'].value_counts().reset_index()
-    state_counts.columns = ['State', 'count']
-    jobs_by_state_fig = px.bar(state_counts, x='State', y='count', title="Jobs by State")
+    state_counts.columns = ['State', 'Count']
+    jobs_by_state_fig = px.bar(state_counts, x='State', y='Count', title="Jobs by State")
 
     # Jobs by Company
     company_counts = filtered_df['Company'].value_counts().reset_index()
-    company_counts.columns = ['Company', 'count']
-    jobs_by_company_fig = px.bar(company_counts, x='Company', y='count', title="Jobs by Company")
-
-    # Treemap for Skills by City
+    company_counts.columns = ['Company', 'Count']
+    jobs_by_company_fig = px.bar(company_counts, x='Company', y='Count', title="Jobs by Company")
     filtered_skills = filtered_df[['City', 'Skills']].dropna()
     filtered_skills['Skills'] = filtered_skills['Skills'].str.split(',')
     exploded_skills = filtered_skills.explode('Skills')
